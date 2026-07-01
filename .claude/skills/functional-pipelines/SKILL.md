@@ -4,15 +4,14 @@ description: >-
   Refactor imperative TypeScript into functional pipelines — and write new code
   the same way. Use whenever you are asked to "refactor to a pipeline", "remove
   the control flow", "make this functional", "use a chain", "wrap this in
-  Either", or when you touch a function/method body that contains if/else,
+  tryCatch", or when you touch a function/method body that contains if/else,
   switch, for/while, try/catch, throw, or reassigned locals. The single rule:
   every function and method body is ONE expression — a chain/pipeline that
   composes small named steps — with no statement-level control flow. Branch with
-  ts-pattern match, compose with lodash-es chain().thru().value() and fp-ts
-  pipe/flow, thread absence as Option / `X | undefined`, and capture anything
-  that can throw as an fp-ts Either instead of try/catch. Primarily a
-  refactoring skill; the target is existing code, but new code follows the same
-  shape.
+  ts-pattern match, compose with lodash-es chain().thru().value() and flow,
+  thread absence as `X | undefined`, and capture anything that can throw with
+  ramda tryCatch instead of try/catch. Primarily a refactoring skill; the target
+  is existing code, but new code follows the same shape.
 ---
 
 # Functional pipelines
@@ -25,8 +24,8 @@ The whole discipline is one rule:
 
 No `if`/`else`, no `switch`, no `for`/`while`, no `try`/`catch`, no `throw`, no
 `let` you reassign, no stack of intermediate mutable locals. Those are the
-symptoms this skill exists to remove. A body should read as one `chain(...)` /
-`pipe(...)` that flows a value from input to output.
+symptoms this skill exists to remove. A body should read as one `chain(...)`
+that flows a value from input to output.
 
 This is **mainly a refactoring skill**. The usual starting point is an existing
 imperative body; the job is to turn it into a pipeline without changing what it
@@ -37,9 +36,13 @@ The four tools, and what each replaces:
 | Tool | Replaces | Use it for |
 | --- | --- | --- |
 | **lodash-es** `chain().thru().value()` | intermediate locals, nested calls, hand-rolled loops/guards | the backbone pipeline; data-shaping helpers |
+| **lodash-es** `flow` | glue between steps; naming an intermediate argument | composing existing functions point-free into one reusable step |
 | **ts-pattern** `match().with().otherwise()` | `if`/`else if`/`switch`, `instanceof`/`typeof` ladders | every branch that narrows a type or has >1 arm |
-| **fp-ts** `pipe` / `flow` | glue between steps that aren't a lodash chain (esp. `Either`/`Option`) | composing effectful/absent-aware steps |
-| **fp-ts** `Either` / `Option` (`E.tryCatch`, `TE.tryCatch`) | `try`/`catch`, `throw`, `null`/`undefined` checks | representing failure and absence as values |
+| **ramda** `tryCatch` | `try`/`catch`, `throw` | turning a throwing operation into a value with a fallback |
+
+> **ramda is not part of the base stack — install it before using `tryCatch`**
+> (`pnpm add ramda` / `npm i ramda`, plus `@types/ramda`). It is used *only* for
+> failure handling; everything else stays on lodash-es.
 
 ---
 
@@ -53,11 +56,11 @@ with the construct on the right. This table is the checklist for a refactor.
 | `if (x) … else …` | `match(x).with(…, …).otherwise(…)` |
 | `switch (x) { case … }` | `match(x).with(…).with(…).exhaustive()` |
 | `for` / `while` / `.forEach` accumulating | `map` / `filter` / `reduce` / `chain().thru()` |
-| `try { … } catch (e) { … }` | `E.tryCatch(() => …, toError)` then fold |
-| `throw new Error(…)` | return `E.left(error)` (or `O.none`) |
-| `let acc = …; acc = …` | thread the value through `.thru()` / `pipe` steps |
+| `try { … } catch (e) { … }` | `R.tryCatch(() => …, onError)` |
+| `throw new Error(…)` | return a fallback value from the `tryCatch` catcher |
+| `let acc = …; acc = …` | thread the value through `.thru()` / `flow` steps |
 | a chain of `const a = …; const b = f(a);` | inline into `chain(a).thru(f).thru(g).value()` |
-| manual `if (x == null) return` guards | `O.fromNullable` / thread `X \| undefined` |
+| manual `if (x == null) return` guards | thread `X \| undefined`; short-circuit with `?.` / lodash `get` |
 
 A **single flat early-return guard** or a **single flat ternary** is tolerated —
 `if (isEmpty(items)) return undefined;` or `cond ? a : b`. The moment there is a
@@ -101,33 +104,24 @@ it down through named steps, `.value()` out the result.
 
 ---
 
-## Tool 2 — fp-ts `pipe` / `flow` for composition that isn't a data chain
+## Tool 2 — lodash-es `flow` for point-free composition
 
-`chain().thru()` is ideal for shaping one value. Reach for fp-ts `pipe` (apply a
-value through functions) and `flow` (compose functions point-free) when the
-steps are heterogeneous — especially once `Either`/`Option` enter the pipeline
-and each step must be threaded with `E.map` / `E.chain` / `O.map`.
+`chain().thru()` shapes one concrete value you have in hand. When you instead
+want to build a *reusable step* out of smaller functions — without naming an
+intermediate argument — compose them point-free with lodash-es `flow`
+(left-to-right).
 
 ```ts
-import { pipe, flow } from 'fp-ts/function';
-import * as O from 'fp-ts/Option';
-
-// pipe: run a concrete value through steps.
-export const getDisplayName = (input: RawUser | undefined): string =>
-  pipe(
-    O.fromNullable(input),
-    O.map(toFullName),
-    O.map(capitalize),
-    O.getOrElse(() => 'Anonymous'),
-  );
+import { flow } from 'lodash-es';
 
 // flow: build a reusable step out of smaller ones, point-free.
 export const normalizeName = flow(trim, toLowerCase, capitalize);
 ```
 
-Rule of thumb: **lodash `chain` for shaping data, fp-ts `pipe`/`flow` for
-threading `Either`/`Option` and composing functions.** They coexist — a `.thru()`
-step can itself be a `pipe(...)`, and a `pipe` step can be a `chain(...).value()`.
+Rule of thumb: **`chain` when you have a value and want to flow it through steps;
+`flow` when you want to name a new function that *is* the composition of existing
+ones.** They coexist — a `.thru()` step can be a `flow(...)`, and a `flow` step
+can be a `chain(...).value()`.
 
 ---
 
@@ -153,11 +147,12 @@ example below.
 
 ---
 
-## Tool 4 — capture failure as an fp-ts `Either`, never `try`/`catch`
+## Tool 4 — capture failure with ramda `tryCatch`, never `try`/`catch`
 
-Anything that can throw is wrapped so the failure becomes a *value* on the `Left`
-channel, and the pipeline continues functionally. **`try`/`catch` and `throw`
-never appear in a body.**
+Anything that can throw is wrapped so the failure becomes a *value* — a fallback
+the pipeline continues with. **`try`/`catch` and `throw` never appear in a
+body.** Use ramda's `tryCatch`; install ramda first (`pnpm add ramda` +
+`@types/ramda`) — it is not part of the base stack.
 
 ### The problem this solves
 
@@ -181,11 +176,13 @@ try {
 ### The refactor
 
 Two named pieces — normalize the unknown error with `match`, then wrap the
-operation in `E.tryCatch` and fold both channels:
+operation in `R.tryCatch`. `R.tryCatch(tryer, catcher)` returns a function that
+runs `tryer`; if it throws, `catcher` receives the error and returns the
+fallback. There is no second channel to fold — the catcher already produces the
+value the pipeline continues with.
 
 ```ts
-import { pipe } from 'fp-ts/function';
-import * as E from 'fp-ts/Either';
+import * as R from 'ramda';
 import { match, P } from 'ts-pattern';
 
 const toErrorMessage = (error: unknown): string =>
@@ -194,58 +191,56 @@ const toErrorMessage = (error: unknown): string =>
     .with(P.string, (s) => s)
     .otherwise(() => 'Unknown error occurred');
 
-pipe(
-  E.tryCatch(() => someOperation(), toErrorMessage),
-  E.fold(showToast, () => undefined),
+const runSafely = R.tryCatch(
+  () => someOperation(),
+  (error: unknown) => showToast(toErrorMessage(error)),
+);
+
+runSafely();
+```
+
+`R.tryCatch` swallows the `throw` and hands the error to `catcher` — no `try`,
+no `catch`, no `if` ladder, one expression. When `tryer` returns a value, give
+the catcher a fallback of the same type so the result is usable downstream:
+
+```ts
+const parseOrDefault = R.tryCatch(
+  (raw: string) => JSON.parse(raw) as Config,
+  () => DEFAULT_CONFIG,
 );
 ```
 
-`E.tryCatch(thunk, onThrow)` runs the throwing operation and yields
-`Either<string, Result>`: `Left` holds the normalized message, `Right` holds the
-success value. `E.fold(onLeft, onRight)` collapses both channels — here, toast on
-failure, do nothing on success. No `try`, no `catch`, no `if` ladder, one
-pipeline.
+### Async — fold the rejection on the promise
 
-### Async — `TaskEither`
-
-For promises, use `TE.tryCatch`; the result is a `Task<Either<…>>` you compose
-the same way and run at the edge.
+`R.tryCatch` is synchronous; it cannot catch a rejected promise. Keep the throw
+out of an async body by folding both outcomes with the promise's own two-arm
+`then` (success handler, failure handler):
 
 ```ts
-import { pipe } from 'fp-ts/function';
-import * as E from 'fp-ts/Either';
-import * as TE from 'fp-ts/TaskEither';
-
-export const loadUser = (id: string): TE.TaskEither<string, User> =>
-  pipe(
-    TE.tryCatch(() => fetchUser(id), toErrorMessage),
-    TE.map(normalizeUser),
-  );
-
-// at the edge (an event handler / effect), run the Task and fold:
-pipe(await loadUser(id)(), E.fold(showToast, renderUser));
+export const loadUser = (id: string): Promise<User | undefined> =>
+  fetchUser(id).then(normalizeUser, (error) => {
+    showToast(toErrorMessage(error));
+    return undefined;
+  });
 ```
 
-Keep the `Either`/`TaskEither` threaded through the whole pipeline; only fold it
-into a side effect (toast, render, log) at the very edge — the outermost handler,
-effect, or subscription.
+`then(onFulfilled, onRejected)` collapses success and failure without a `try`.
+Do the side effect (toast, log) only in the failure arm, at the edge.
 
-### Absence — `Option`
+### Absence — thread `X | undefined`
 
-Model "might be missing" as `Option` (or thread `X | undefined` and let later
-steps short-circuit), never scattered `if (x == null)` checks.
+Model "might be missing" by threading `X | undefined` through the chain and
+letting later steps short-circuit with `?.` (or lodash `get`), never scattered
+`if (x == null)` checks.
 
 ```ts
-import { pipe } from 'fp-ts/function';
-import * as O from 'fp-ts/Option';
+import { chain } from 'lodash-es';
 
 export const getPrimaryEmail = (user: User | undefined): string | undefined =>
-  pipe(
-    O.fromNullable(user),
-    O.chain((u) => O.fromNullable(u.emails)),
-    O.map((emails) => emails[0]),
-    O.toUndefined,
-  );
+  chain(user)
+    .thru((u) => u?.emails)
+    .thru((emails) => emails?.[0])
+    .value();
 ```
 
 ---
@@ -253,27 +248,28 @@ export const getPrimaryEmail = (user: User | undefined): string | undefined =>
 ## Putting it together — one body, one pipeline
 
 A refactored body composes all four tools into a single expression: a `chain`
-backbone, `match` for the branches, `Either`/`Option` for failure and absence.
+backbone, `match` for the branches, ramda `tryCatch` for failure, threaded
+`| undefined` for absence.
 
 ```ts
 import { chain } from 'lodash-es';
-import { pipe } from 'fp-ts/function';
-import * as E from 'fp-ts/Either';
+import * as R from 'ramda';
 import { match, P } from 'ts-pattern';
 
+const parseJson = R.tryCatch(
+  (value: string) => JSON.parse(value) as Config,
+  () => DEFAULT_CONFIG,
+);
+
 export const parseConfig = (raw: string | undefined): Config =>
-  chain(raw)
-    .thru((value) => E.tryCatch(() => JSON.parse(value ?? '{}'), toErrorMessage))
-    .thru(E.map(withDefaults))
-    .thru(
-      E.fold(
-        () => DEFAULT_CONFIG,
-        (config) =>
-          match(config)
-            .with({ mode: 'strict' }, applyStrictRules)
-            .with({ mode: P.string }, applyLooseRules)
-            .otherwise(() => DEFAULT_CONFIG),
-      ),
+  chain(raw ?? '{}')
+    .thru(parseJson)
+    .thru(withDefaults)
+    .thru((config) =>
+      match(config)
+        .with({ mode: 'strict' }, applyStrictRules)
+        .with({ mode: P.string }, applyLooseRules)
+        .otherwise(() => DEFAULT_CONFIG),
     )
     .value();
 ```
@@ -292,16 +288,16 @@ Given an imperative function or method body:
    — in an Angular class — a `private` method).
 2. **Replace branches.** Turn every `if`/`else`/`switch`/`instanceof`/`typeof`
    into a `ts-pattern` `match`.
-3. **Wrap throwers.** Turn every `try`/`catch` into `E.tryCatch` (or
-   `TE.tryCatch` for async); turn every `throw` into `E.left` / `O.none`. Push
-   the fold to the outermost edge.
-4. **Thread absence.** Replace `null`/`undefined` guards with `O.fromNullable`
-   or a threaded `X | undefined` that later steps short-circuit on.
+3. **Wrap throwers.** Turn every `try`/`catch` into ramda `R.tryCatch(tryer,
+   catcher)`, where the catcher returns a fallback value; turn every `throw`
+   into that fallback. For async, fold the rejection with `promise.then(onOk,
+   onErr)`. Do the side effect only at the outermost edge.
+4. **Thread absence.** Replace `null`/`undefined` guards by threading `X |
+   undefined` and short-circuiting later steps with `?.` / lodash `get`.
 5. **Kill the locals.** Collapse the chain of `const a = …; const b = f(a); …`
-   and any reassigned `let` into one `chain(...).thru(...).value()` or
-   `pipe(...)`.
-6. **Annotate the return type** explicitly, including `Either`/`Option`/
-   `| undefined` variants.
+   and any reassigned `let` into one `chain(...).thru(...).value()` or a
+   `flow(...)`.
+6. **Annotate the return type** explicitly, including `| undefined` variants.
 7. **Verify behavior is unchanged** — run the existing tests (or add them) before
    and after; a pipeline refactor must be behavior-preserving.
 
@@ -310,15 +306,15 @@ Given an imperative function or method body:
 ## Anti-patterns to remove on sight
 
 - `if`/`else if`/`switch` in a body where a `ts-pattern` `match` fits.
-- `try`/`catch`/`throw` anywhere in a body — wrap in `Either`/`TaskEither`.
+- `try`/`catch`/`throw` anywhere in a body — wrap in ramda `tryCatch`.
 - `instanceof`/`typeof` ladders — collapse into `match(...).with(P.instanceOf(...), …)`.
 - `for`/`while`/`forEach` that accumulates — use `map`/`filter`/`reduce` or a
   lodash chain.
 - A reassigned `let`, or a staircase of intermediate `const`s feeding the next —
   thread the value through one pipeline.
-- Scattered `x == null` / `x === undefined` guards — `O.fromNullable` or a
-  threaded `X | undefined`.
-- A folded `Either`/`Option` deep inside the pipeline instead of at the edge —
-  keep it wrapped until the outermost handler.
+- Scattered `x == null` / `x === undefined` guards — thread `X | undefined` and
+  short-circuit with `?.`.
+- A side effect (toast, log, render) buried mid-pipeline instead of at the
+  outermost handler — keep the chain pure and do effects only at the edge.
 - A top-level function doing real logic itself instead of only composing named
   steps.

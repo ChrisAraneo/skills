@@ -96,7 +96,7 @@ it down through named steps, `.value()` out the result.
 
 - Prefer lodash-es helpers over hand-written loops and guards: `chain`, `get`,
   `map`, `filter`, `compact`, `groupBy`, `sortBy`, `isUndefined`, `isEqual`,
-  `keyBy`, `uniqBy`.
+  `keyBy`, `uniqBy`, `noop`.
 - When a step needs to carry extra state forward, `.thru()` into an object
   literal and keep threading that object — never introduce a mutable `let`.
 - Extract each meaningful step into its own named function so the chain reads as
@@ -279,6 +279,39 @@ No `let`, no `if`, no `try` — the value enters at `raw` and flows out as
 
 ---
 
+## Small conventions
+
+Two micro-rules that apply everywhere in the codebase, inside a pipeline or not:
+
+- **`() => undefined` → lodash `noop`.** A no-op thunk is always spelled with
+  lodash-es `noop`, never a hand-written `() => undefined`. This covers empty
+  callbacks, default handlers, and match/promise arms that intentionally do
+  nothing.
+
+  ```ts
+  import { noop } from 'lodash-es';
+
+  // Instead of: onDone={() => undefined}
+  onDone={noop}
+  ```
+
+- **`P.nullish` → destructured `nullish`.** When you match on `nullish`,
+  destructure it off `P` once at the top of the file and use the bare name in the
+  pattern — never `P.nullish` inline.
+
+  ```ts
+  import { match, P } from 'ts-pattern';
+
+  const { nullish } = P;
+
+  export const toLabel = (value: string | null | undefined): string =>
+    match(value)
+      .with(nullish, () => 'None')
+      .otherwise((v) => v);
+  ```
+
+---
+
 ## Refactoring workflow
 
 Given an imperative function or method body:
@@ -318,3 +351,6 @@ Given an imperative function or method body:
   outermost handler — keep the chain pure and do effects only at the edge.
 - A top-level function doing real logic itself instead of only composing named
   steps.
+- A hand-written `() => undefined` no-op thunk — use lodash `noop`.
+- `P.nullish` used inline — destructure `const { nullish } = P;` and match on the
+  bare `nullish`.

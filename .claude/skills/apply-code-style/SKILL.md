@@ -10,8 +10,10 @@ description: >-
   layered on top — logic used by a single component/service stays as a private
   method (not its own file), display-only formatting becomes a Pipe, logic
   shared by multiple components becomes a service, types/interfaces/constants
-  get their own files, and method bodies prefer match/chaining over if/else and
-  signals over plain mutable state.
+  get their own files, method bodies prefer match/chaining over if/else and
+  signals over plain mutable state, constructor/ngOnInit/ngOnChanges/
+  ngOnDestroy are avoided in favor of field initializers/computed/effect where
+  possible, and any never-reassigned field must be readonly.
 ---
 
 # House code style
@@ -448,13 +450,103 @@ export class ThemeService {
 }
 ```
 
+## Avoid `constructor`/`ngOnInit`/`ngOnChanges`/`ngOnDestroy` where signals suffice
+
+Lifecycle hooks and the constructor exist to solve timing problems that
+signals mostly already solve. **Default to no lifecycle hook at all** — reach
+for one only when nothing signal-shaped covers the case.
+
+- **`constructor()`** — avoid it. Field initializers run in the same
+  injection context as the constructor, so `inject()`, `effect()`,
+  `toSignal()`, and `.pipe(takeUntilDestroyed())` all work directly as field
+  initializers. Keep a constructor only when you genuinely need imperative
+  statements to run in a specific order before any field is readable — rare.
+- **`ngOnInit`** — avoid it for setup that only reads injected services or
+  static config; do that in a field initializer instead. If the setup depends
+  on an input's value, express it as `computed()` (derived state) or
+  `effect()` (a side effect) reacting to that input signal — both already run
+  once inputs are available and again on every change, so there's no need for
+  `ngOnInit` to single out "the first run."
+- **`ngOnChanges`** — avoid it entirely once inputs are signal-based
+  (`input()` / `model()`): a `computed()` or `effect()` reacting to the input
+  signal re-runs on every change already, which is exactly what `ngOnChanges`
+  exists for. `ngOnChanges` is only relevant to legacy `@Input()`-decorated
+  fields.
+- **`ngOnDestroy`** — avoid manual unsubscribe/cleanup. Use
+  `.pipe(takeUntilDestroyed())` on an RxJS subscription (as a field
+  initializer) or an `effect()`'s cleanup callback
+  (`effect((onCleanup) => { ...; onCleanup(() => ...); })`). Keep `ngOnDestroy`
+  only for teardown APIs that have no signal / `DestroyRef` equivalent.
+- **Hooks that usually remain legitimate:** `ngAfterViewInit` /
+  `ngAfterContentInit` (and their `...Checked` counterparts) fire at
+  DOM/content-projection-ready timing that has no field-initializer or signal
+  equivalent — keep them for work that genuinely needs the view or projected
+  content to exist first (reading a `viewChild()` signal's `.nativeElement`,
+  bootstrapping a third-party widget against a DOM node).
+
+```ts
+// Avoid: a constructor whose only job is DI plus a subscription.
+export class ToastContainerComponent {
+  readonly toasts = signal<Toast[]>([]);
+
+  private readonly toastService = inject(ToastService);
+
+  constructor() {
+    this.toastService.get.pipe(takeUntilDestroyed()).subscribe((toast) => {
+      this.toasts.update((current) => [...current, toast]);
+    });
+  }
+}
+
+// Prefer: the same subscription as a field initializer — no constructor,
+// since field initializers already run in the injection context.
+export class ToastContainerComponent {
+  readonly toasts = signal<Toast[]>([]);
+
+  private readonly toastService = inject(ToastService);
+
+  private readonly toastSubscription = this.toastService.get
+    .pipe(takeUntilDestroyed())
+    .subscribe((toast) => {
+      this.toasts.update((current) => [...current, toast]);
+    });
+}
+```
+
+## Readonly fields are mandatory when never reassigned
+
+If a class property's *reference* is set once and never reassigned
+afterward, it **must** be declared `readonly`. A field missing `readonly`
+when nothing ever reassigns it is a bug to fix, not a style nit — the missing
+modifier claims a mutability that doesn't exist and invites an accidental
+future reassignment the compiler won't otherwise catch.
+
+- Applies everywhere: injected services (`private readonly foo =
+  inject(Foo)`), signals and computed signals (`readonly count = signal(0)`,
+  `readonly doubled = computed(...)`), signal-based `input()` /
+  `input.required()` / `model()` / `output()` fields, icon/constant fields,
+  and any other field assigned once at declaration or in the constructor.
+- **Signals stay `readonly` even though their value changes.** `readonly
+  count = signal(0)` is correct: `count.set(5)` mutates what the signal
+  *holds*; it does not reassign the `count` field itself — the field always
+  points at the same `Signal` object.
+- **Exception:** legacy `@Input()`-decorated fields are reassigned by
+  Angular's change detection and cannot be `readonly`. That's one more reason
+  to prefer signal-based `input()` — unlike `@Input()`, those fields can (and
+  must) be `readonly`.
+- A field the class itself reassigns in more than one place (e.g. `this.form
+  = ...` set from two different methods) is correctly *not* `readonly` — this
+  rule targets fields assigned once and never touched again, not fields in
+  general.
+
 ## Keep the shell thin — what stays on the class
 
 Belongs directly in the Angular class:
 
 - Decorator metadata (`@Component`, `@Injectable`, selectors, templates, styles).
 - Signal/observable **state fields** and DI via `inject()`.
-- **Lifecycle hooks** and event handlers.
+- **Lifecycle hooks only where no field-initializer/signal equivalent
+  exists** (see "Avoid `constructor`/`ngOnInit`/..." above) and event handlers.
 - **Private methods used only by this class** (rule 1 above) — including
   non-trivial ones — written with `match`/chaining internally.
 - Framework wiring that genuinely cannot be pure (subscribing a socket, setting a
@@ -489,3 +581,8 @@ Moves out of the class:
 - `@Input()` / `@Output()` decorators, getter-based derived state, or
   constructor-injected fields in **new** code where `input()` / `output()` /
   `computed()` / `inject()` are available.
+- A `constructor()`, `ngOnInit`, `ngOnChanges`, or `ngOnDestroy` doing work a
+  field initializer, `computed()`, `effect()`, or `takeUntilDestroyed()` could
+  do instead.
+- A field that is assigned once and never reassigned again but is missing
+  `readonly` — fix it in place, it's a defect, not a style choice.

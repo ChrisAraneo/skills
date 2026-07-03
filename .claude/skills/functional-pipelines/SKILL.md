@@ -40,10 +40,6 @@ The four tools, and what each replaces:
 | **ts-pattern** `match().with().otherwise()` | `if`/`else if`/`switch`, `instanceof`/`typeof` ladders | every branch that narrows a type or has >1 arm |
 | **ramda** `tryCatch` | `try`/`catch`, `throw` | turning a throwing operation into a value with a fallback |
 
-> **ramda is not part of the base stack — install it before using `tryCatch`**
-> (`pnpm add ramda` / `npm i ramda`, plus `@types/ramda`). It is used *only* for
-> failure handling; everything else stays on lodash-es.
-
 ---
 
 ## Banned in a body — and its replacement

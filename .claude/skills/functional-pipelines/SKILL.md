@@ -25,9 +25,10 @@ The whole discipline is one rule:
 > body.**
 
 No `if`/`else`, no ternary `?:`, no `switch`, no `for`/`while`, no `try`/`catch`,
-no `throw`, no `let` you reassign, no stack of intermediate mutable locals. Those
-are the symptoms this skill exists to remove. A body should read as one
-`chain(...)` that flows a value from input to output.
+no `throw`, no `let` you reassign, no stack of intermediate mutable locals.
+**Imperative code of any kind is strictly forbidden in a body.** Those are the
+symptoms this skill exists to remove. A body should read as one `chain(...)`
+that flows a value from input to output.
 
 This is **mainly a refactoring skill**. The usual starting point is an existing
 imperative body; the job is to turn it into a pipeline without changing what it
@@ -68,8 +69,9 @@ with the construct on the right. This table is the checklist for a refactor.
 Every branch — two arms or many, a plain `if`/`else`, a ternary `?:`, a `switch`,
 or an `instanceof`/`typeof` ladder — is a `ts-pattern` `match`. There is no
 threshold; `match` is the single branching tool. End with `.otherwise(...)` for
-an open set or `.exhaustive()` when the cases are total. Use `P` for wildcard,
-array, and refinement patterns.
+an open set or `.exhaustive()` when the cases are total. Import `P` from
+`ts-pattern` for its pattern helpers, but always destructure them at the top of
+the file — never use `P.` inline in patterns (see Small conventions).
 
 Imperative — a two-arm `if`/`else`:
 
@@ -123,11 +125,13 @@ Multi-arm branches and type narrowing follow the same pattern — just add more 
 ```ts
 import { match, P } from 'ts-pattern';
 
+const { number, array } = P;
+
 export const toStatusLabel = (state: RequestState): string =>
   match(state)
     .with({ kind: 'loading' }, () => 'Loading…')
-    .with({ kind: 'error', code: P.number }, ({ code }) => `Failed (${code})`)
-    .with({ kind: 'ready', items: P.array() }, ({ items }) => `${items.length} items`)
+    .with({ kind: 'error', code: number }, ({ code }) => `Failed (${code})`)
+    .with({ kind: 'ready', items: array() }, ({ items }) => `${items.length} items`)
     .exhaustive();
 ```
 
@@ -165,9 +169,35 @@ it down through named steps, `.value()` out the result.
   `map`, `filter`, `compact`, `groupBy`, `sortBy`, `isUndefined`, `isEqual`,
   `keyBy`, `uniqBy`, `noop`.
 - When a step needs to carry extra state forward, `.thru()` into an object
-  literal and keep threading that object — never introduce a mutable `let`.
+  literal and keep threading that object, **adding one new property per step** —
+  never introduce a mutable `let`. This is the direct replacement for an
+  imperative staircase of intermediate `const`s.
 - Extract each meaningful step into its own named function so the chain reads as
   a sentence. Reuse existing steps before writing new ones.
+
+Imperative staircase — **strictly forbidden**:
+
+```ts
+// FORBIDDEN — imperative sequential locals
+const raw = getField(input);
+const parsed = parse(raw);
+const enriched = enrich(parsed, raw);
+const result = format(enriched);
+```
+
+Pipeline — thread through `.thru()` steps, adding a property when a later step
+needs earlier context:
+
+```ts
+import { chain } from 'lodash-es';
+
+export const process = (input: Input): Output =>
+  chain({ raw: getField(input) })
+    .thru(({ raw }) => ({ raw, parsed: parse(raw) }))
+    .thru(({ raw, parsed }) => ({ parsed, enriched: enrich(parsed, raw) }))
+    .thru(({ enriched }) => format(enriched))
+    .value();
+```
 
 ---
 
@@ -229,10 +259,12 @@ to fold — the catcher already produces the value the pipeline continues with.
 import { tryCatch } from 'ramda';
 import { match, P } from 'ts-pattern';
 
+const { instanceOf, string } = P;
+
 const toErrorMessage = (error: unknown): string =>
   match(error)
-    .with(P.instanceOf(Error), (e) => e.message)
-    .with(P.string, (s) => s)
+    .with(instanceOf(Error), (e) => e.message)
+    .with(string, (s) => s)
     .otherwise(() => 'Unknown error occurred');
 
 const runSafely = tryCatch(
@@ -300,6 +332,8 @@ import { chain } from 'lodash-es';
 import { tryCatch } from 'ramda';
 import { match, P } from 'ts-pattern';
 
+const { string } = P;
+
 const parseJson = tryCatch(
   (value: string) => JSON.parse(value) as Config,
   () => DEFAULT_CONFIG,
@@ -312,7 +346,7 @@ export const parseConfig = (raw: string | undefined): Config =>
     .thru((config) =>
       match(config)
         .with({ mode: 'strict' }, applyStrictRules)
-        .with({ mode: P.string }, applyLooseRules)
+        .with({ mode: string }, applyLooseRules)
         .otherwise(() => DEFAULT_CONFIG),
     )
     .value();
@@ -351,19 +385,33 @@ not:
   onDone={noop}
   ```
 
-- **`P.nullish` → destructured `nullish`.** When you match on `nullish`,
-  destructure it off `P` once at the top of the file and use the bare name in the
-  pattern — never `P.nullish` inline.
+- **Destructure everything off `P` — never use `P.` inline.** Every pattern
+  helper must be destructured at the top of the file and used bare in patterns.
+  `P.nullish`, `P.union`, `P.not`, `P.string`, `P.number`, `P.instanceOf` —
+  none appear with the `P.` prefix in pattern positions.
 
   ```ts
   import { match, P } from 'ts-pattern';
 
-  const { nullish } = P;
+  const { nullish, union, not } = P;
 
+  // P.nullish → nullish
   export const toLabel = (value: string | null | undefined): string =>
     match(value)
       .with(nullish, () => 'None')
       .otherwise((v) => v);
+
+  // P.union → union
+  export const toMode = (flag: string): Mode =>
+    match(flag)
+      .with(union('-i', '--ignore'), () => 'ignore' as const)
+      .otherwise(() => 'write' as const);
+
+  // P.not → not
+  export const toMessage = (error: Error | null): string =>
+    match(error)
+      .with(not(null), (e) => e.message)
+      .otherwise(() => 'ok');
   ```
 
 ---
@@ -395,6 +443,10 @@ Given an imperative function or method body:
 
 ## Anti-patterns to remove on sight
 
+- Any imperative code — sequential `const` staircases, `for`/`while` loops,
+  mutable `let` accumulators — is **strictly forbidden**. Replace with
+  `chain(...).thru(...).value()` or `flow(...)`, carrying extra context by
+  adding properties to an object in each `.thru()` step.
 - An `if`/`else`, ternary `?:`, or `switch` in a body not replaced with a
   `ts-pattern` `match`.
 - `try`/`catch`/`throw` anywhere in a body — wrap in ramda `tryCatch`.
@@ -412,5 +464,6 @@ Given an imperative function or method body:
 - A top-level function doing real logic itself instead of only composing named
   steps.
 - A hand-written `() => undefined` no-op thunk — use lodash `noop`.
-- `P.nullish` used inline — destructure `const { nullish } = P;` and match on the
-  bare `nullish`.
+- Any `P.*` used inline (`P.nullish`, `P.union`, `P.not`, `P.string`, etc.) —
+  destructure from `P` at the top of the file and use the bare name in patterns.
+

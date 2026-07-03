@@ -3,15 +3,17 @@ name: functional-pipelines
 description: >-
   Refactor imperative TypeScript into functional pipelines — and write new code
   the same way. Use whenever you are asked to "refactor to a pipeline", "remove
-  the control flow", "make this functional", "use a chain", "wrap this in
-  tryCatch", or when you touch a function/method body that contains if/else,
-  switch, for/while, try/catch, throw, or reassigned locals. The single rule:
-  every function and method body is ONE expression — a chain/pipeline that
-  composes small named steps — with no statement-level control flow. Branch with
-  ts-pattern match, compose with lodash-es chain().thru().value() and flow,
-  thread absence as `X | undefined`, and capture anything that can throw with
-  ramda tryCatch instead of try/catch. Primarily a refactoring skill; the target
-  is existing code, but new code follows the same shape.
+  the control flow", "make this functional", "use a chain", "replace the
+  if/else", "replace the ternaries", "wrap this in tryCatch", or when you touch a
+  function/method body that contains if/else, a ternary, switch, for/while,
+  try/catch, throw, or reassigned locals. The single rule: every function and
+  method body is ONE expression — a chain/pipeline that composes small named
+  steps — with no statement-level control flow. Branch a two-way if/else or
+  ternary with ramda ifElse and anything with more cases with ts-pattern match,
+  compose with lodash-es chain().thru().value() and flow, thread absence as
+  `X | undefined`, and capture anything that can throw with ramda tryCatch
+  instead of try/catch. Primarily a refactoring skill; the target is existing
+  code, but new code follows the same shape.
 ---
 
 # Functional pipelines
@@ -22,22 +24,23 @@ The whole discipline is one rule:
 > composes small named steps. There is no statement-level control flow in the
 > body.**
 
-No `if`/`else`, no `switch`, no `for`/`while`, no `try`/`catch`, no `throw`, no
-`let` you reassign, no stack of intermediate mutable locals. Those are the
-symptoms this skill exists to remove. A body should read as one `chain(...)`
-that flows a value from input to output.
+No `if`/`else`, no ternary `?:`, no `switch`, no `for`/`while`, no `try`/`catch`,
+no `throw`, no `let` you reassign, no stack of intermediate mutable locals. Those
+are the symptoms this skill exists to remove. A body should read as one
+`chain(...)` that flows a value from input to output.
 
 This is **mainly a refactoring skill**. The usual starting point is an existing
 imperative body; the job is to turn it into a pipeline without changing what it
 does. New code is written in the same shape from the start.
 
-The four tools, and what each replaces:
+The five tools, and what each replaces:
 
 | Tool | Replaces | Use it for |
 | --- | --- | --- |
+| **ramda** `ifElse(pred, onTrue, onFalse)` | a two-outcome `if`/`else`; a ternary `?:` | every branch with **exactly two** arms |
 | **lodash-es** `chain().thru().value()` | intermediate locals, nested calls, hand-rolled loops/guards | the backbone pipeline; data-shaping helpers |
 | **lodash-es** `flow` | glue between steps; naming an intermediate argument | composing existing functions point-free into one reusable step |
-| **ts-pattern** `match().with().otherwise()` | `if`/`else if`/`switch`, `instanceof`/`typeof` ladders | every branch that narrows a type or has >1 arm |
+| **ts-pattern** `match().with().otherwise()` | `if`/`else if`/`switch`, `instanceof`/`typeof` ladders | every branch with **more than two** arms or that narrows a type |
 | **ramda** `tryCatch` | `try`/`catch`, `throw` | turning a throwing operation into a value with a fallback |
 
 ---
@@ -49,22 +52,83 @@ with the construct on the right. This table is the checklist for a refactor.
 
 | Imperative construct | Pipeline replacement |
 | --- | --- |
-| `if (x) … else …` | `match(x).with(…, …).otherwise(…)` |
-| `switch (x) { case … }` | `match(x).with(…).with(…).exhaustive()` |
+| `if (x) … else …` (two outcomes) | `ifElse(pred, onTrue, onFalse)` |
+| `cond ? a : b` (ternary) | `ifElse(pred, onTrue, onFalse)` |
+| `if / else if / else`, `switch` (more than two outcomes) | `match(x).with(…).otherwise(…)` / `.exhaustive()` |
 | `for` / `while` / `.forEach` accumulating | `map` / `filter` / `reduce` / `chain().thru()` |
-| `try { … } catch (e) { … }` | `R.tryCatch(() => …, onError)` |
+| `try { … } catch (e) { … }` | `tryCatch(() => …, onError)` |
 | `throw new Error(…)` | return a fallback value from the `tryCatch` catcher |
 | `let acc = …; acc = …` | thread the value through `.thru()` / `flow` steps |
 | a chain of `const a = …; const b = f(a);` | inline into `chain(a).thru(f).thru(g).value()` |
 | manual `if (x == null) return` guards | thread `X \| undefined`; short-circuit with `?.` / lodash `get` |
 
-A **single flat early-return guard** or a **single flat ternary** is tolerated —
-`if (isEmpty(items)) return undefined;` or `cond ? a : b`. The moment there is a
-second branch or a type narrowing, it becomes a `match`.
+A **single flat early-return guard** is tolerated —
+`if (isEmpty(items)) return undefined;`. But a real branch is never a statement
+and never a `?:`: a two-way branch becomes an `ifElse`, and the moment there is a
+third case or a type narrowing it becomes a `match`.
 
 ---
 
-## Tool 1 — lodash-es `chain().thru().value()` is the backbone
+## Tool 1 — ramda `ifElse` for a two-way branch
+
+A branch with exactly two outcomes — a plain `if`/`else`, or a ternary `?:` — is
+a `ramda` `ifElse`, never a statement and never a `?:`. `ifElse(pred, onTrue,
+onFalse)` returns a function; the predicate and both arms each receive the
+incoming value, so it drops straight into a `.thru()` step. Install ramda first
+(`pnpm add ramda` + `@types/ramda`) — it is not part of the base stack. Always
+import ramda helpers **by name** — `import { ifElse } from 'ramda'` — and call
+them bare (`ifElse(...)`); never `import * as R` and never `R.ifElse`.
+
+Imperative — a two-arm `if`/`else`:
+
+```ts
+function toAccessLabel(user: User): string {
+  if (user.isActive) {
+    return 'Active';
+  } else {
+    return 'Suspended';
+  }
+}
+```
+
+Pipeline — one `ifElse`:
+
+```ts
+import { ifElse } from 'ramda';
+
+export const toAccessLabel = ifElse(
+  (user: User) => user.isActive,
+  () => 'Active',
+  () => 'Suspended',
+);
+```
+
+A ternary is the **same** replacement — the value drives the predicate, so
+`?:` never survives a refactor either:
+
+```ts
+// Instead of: user.isActive ? 'Active' : 'Suspended'
+ifElse(
+  (user: User) => user.isActive,
+  () => 'Active',
+  () => 'Suspended',
+)(user);
+```
+
+As a chain step it stays point-free:
+
+```ts
+chain(user)
+  .thru(ifElse((u: User) => u.isActive, toActiveView, toSuspendedView))
+  .value();
+```
+
+The line between this and `match`: **exactly two arms → `ifElse`; three or more
+arms, or any type narrowing, → `match` (Tool 4).**
+
+---
+
+## Tool 2 — lodash-es `chain().thru().value()` is the backbone
 
 The default shape of a body is a lodash chain of small `.thru()` steps, each a
 named function that takes the previous step's output. The top-level function does
@@ -100,7 +164,7 @@ it down through named steps, `.value()` out the result.
 
 ---
 
-## Tool 2 — lodash-es `flow` for point-free composition
+## Tool 3 — lodash-es `flow` for point-free composition
 
 `chain().thru()` shapes one concrete value you have in hand. When you instead
 want to build a *reusable step* out of smaller functions — without naming an
@@ -121,11 +185,14 @@ can be a `chain(...).value()`.
 
 ---
 
-## Tool 3 — ts-pattern `match` over `if`/`switch`
+## Tool 4 — ts-pattern `match` for three or more cases
 
-Every branch that narrows a type or has more than one arm is a `match`. End with
-`.otherwise(...)` for an open set or `.exhaustive()` when the cases are total.
-Use `P` for wildcard, array, and refinement patterns.
+Reach for `match` the moment a branch has **more than two** cases — where an
+`if`/`else if`/`else` chain or a `switch` would be needed and a single `ifElse`
+is not enough — or whenever a branch narrows a type. Two-arm branches stay in
+`ifElse` (Tool 1); everything else is a `match`. End with `.otherwise(...)` for
+an open set or `.exhaustive()` when the cases are total. Use `P` for wildcard,
+array, and refinement patterns.
 
 ```ts
 import { match, P } from 'ts-pattern';
@@ -143,12 +210,11 @@ example below.
 
 ---
 
-## Tool 4 — capture failure with ramda `tryCatch`, never `try`/`catch`
+## Tool 5 — capture failure with ramda `tryCatch`, never `try`/`catch`
 
 Anything that can throw is wrapped so the failure becomes a *value* — a fallback
 the pipeline continues with. **`try`/`catch` and `throw` never appear in a
-body.** Use ramda's `tryCatch`; install ramda first (`pnpm add ramda` +
-`@types/ramda`) — it is not part of the base stack.
+body.** Use ramda's `tryCatch` (ramda is already in the stack from Tool 1).
 
 ### The problem this solves
 
@@ -171,14 +237,14 @@ try {
 
 ### The refactor
 
-Two named pieces — normalize the unknown error with `match`, then wrap the
-operation in `R.tryCatch`. `R.tryCatch(tryer, catcher)` returns a function that
-runs `tryer`; if it throws, `catcher` receives the error and returns the
-fallback. There is no second channel to fold — the catcher already produces the
-value the pipeline continues with.
+Two named pieces — normalize the unknown error with `match` (three cases, so
+`match` not `ifElse`), then wrap the operation in `tryCatch`.
+`tryCatch(tryer, catcher)` returns a function that runs `tryer`; if it throws,
+`catcher` receives the error and returns the fallback. There is no second channel
+to fold — the catcher already produces the value the pipeline continues with.
 
 ```ts
-import * as R from 'ramda';
+import { tryCatch } from 'ramda';
 import { match, P } from 'ts-pattern';
 
 const toErrorMessage = (error: unknown): string =>
@@ -187,7 +253,7 @@ const toErrorMessage = (error: unknown): string =>
     .with(P.string, (s) => s)
     .otherwise(() => 'Unknown error occurred');
 
-const runSafely = R.tryCatch(
+const runSafely = tryCatch(
   () => someOperation(),
   (error: unknown) => showToast(toErrorMessage(error)),
 );
@@ -195,12 +261,12 @@ const runSafely = R.tryCatch(
 runSafely();
 ```
 
-`R.tryCatch` swallows the `throw` and hands the error to `catcher` — no `try`,
+`tryCatch` swallows the `throw` and hands the error to `catcher` — no `try`,
 no `catch`, no `if` ladder, one expression. When `tryer` returns a value, give
 the catcher a fallback of the same type so the result is usable downstream:
 
 ```ts
-const parseOrDefault = R.tryCatch(
+const parseOrDefault = tryCatch(
   (raw: string) => JSON.parse(raw) as Config,
   () => DEFAULT_CONFIG,
 );
@@ -208,7 +274,7 @@ const parseOrDefault = R.tryCatch(
 
 ### Async — fold the rejection on the promise
 
-`R.tryCatch` is synchronous; it cannot catch a rejected promise. Keep the throw
+`tryCatch` is synchronous; it cannot catch a rejected promise. Keep the throw
 out of an async body by folding both outcomes with the promise's own two-arm
 `then` (success handler, failure handler):
 
@@ -243,16 +309,16 @@ export const getPrimaryEmail = (user: User | undefined): string | undefined =>
 
 ## Putting it together — one body, one pipeline
 
-A refactored body composes all four tools into a single expression: a `chain`
-backbone, `match` for the branches, ramda `tryCatch` for failure, threaded
-`| undefined` for absence.
+A refactored body composes these tools into a single expression: a `chain`
+backbone, `ifElse` or `match` for the branches, ramda `tryCatch` for failure,
+threaded `| undefined` for absence.
 
 ```ts
 import { chain } from 'lodash-es';
-import * as R from 'ramda';
+import { tryCatch } from 'ramda';
 import { match, P } from 'ts-pattern';
 
-const parseJson = R.tryCatch(
+const parseJson = tryCatch(
   (value: string) => JSON.parse(value) as Config,
   () => DEFAULT_CONFIG,
 );
@@ -270,14 +336,27 @@ export const parseConfig = (raw: string | undefined): Config =>
     .value();
 ```
 
-No `let`, no `if`, no `try` — the value enters at `raw` and flows out as
-`Config`.
+No `let`, no `if`, no `?:`, no `try` — the value enters at `raw` and flows out as
+`Config`. The three-case branch above is a `match`; had it been a plain
+active/inactive split it would be an `ifElse` instead.
 
 ---
 
 ## Small conventions
 
-Two micro-rules that apply everywhere in the codebase, inside a pipeline or not:
+Three micro-rules that apply everywhere in the codebase, inside a pipeline or
+not:
+
+- **`R.ifElse` → named import `ifElse`.** Never reference ramda through the `R`
+  namespace. Import each helper by name and call it bare — no `import * as R`,
+  no `R.ifElse` / `R.tryCatch`.
+
+  ```ts
+  // Instead of: import * as R from 'ramda';  … R.tryCatch(tryer, catcher)
+  import { ifElse, tryCatch } from 'ramda';
+
+  const runSafely = tryCatch(tryer, catcher);
+  ```
 
 - **`() => undefined` → lodash `noop`.** A no-op thunk is always spelled with
   lodash-es `noop`, never a hand-written `() => undefined`. This covers empty
@@ -315,9 +394,11 @@ Given an imperative function or method body:
 1. **Name the steps.** Read the body top to bottom and identify each distinct
    transformation. Extract each into a small named function (a `const` arrow, or
    — in an Angular class — a `private` method).
-2. **Replace branches.** Turn every `if`/`else`/`switch`/`instanceof`/`typeof`
-   into a `ts-pattern` `match`.
-3. **Wrap throwers.** Turn every `try`/`catch` into ramda `R.tryCatch(tryer,
+2. **Replace branches.** Turn every two-arm `if`/`else` and every ternary `?:`
+   into a ramda `ifElse`; turn every `if`/`else if`/`else`, `switch`, and
+   `instanceof`/`typeof` ladder — anything with three or more cases, or a type
+   narrowing — into a `ts-pattern` `match`.
+3. **Wrap throwers.** Turn every `try`/`catch` into ramda `tryCatch(tryer,
    catcher)`, where the catcher returns a fallback value; turn every `throw`
    into that fallback. For async, fold the rejection with `promise.then(onOk,
    onErr)`. Do the side effect only at the outermost edge.
@@ -334,8 +415,13 @@ Given an imperative function or method body:
 
 ## Anti-patterns to remove on sight
 
-- `if`/`else if`/`switch` in a body where a `ts-pattern` `match` fits.
+- A two-arm `if`/`else`, or a ternary `?:`, in a body — replace with ramda
+  `ifElse`.
+- `if`/`else if`/`switch` with three or more cases where a `ts-pattern` `match`
+  fits.
 - `try`/`catch`/`throw` anywhere in a body — wrap in ramda `tryCatch`.
+- `import * as R from 'ramda'` or an explicit `R.ifElse` / `R.tryCatch` call —
+  import the helper by name and call it bare (`ifElse`, `tryCatch`).
 - `instanceof`/`typeof` ladders — collapse into `match(...).with(P.instanceOf(...), …)`.
 - `for`/`while`/`forEach` that accumulates — use `map`/`filter`/`reduce` or a
   lodash chain.

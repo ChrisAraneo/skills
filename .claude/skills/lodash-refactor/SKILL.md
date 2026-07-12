@@ -58,8 +58,12 @@ Convert `for`, `while`, `do...while`, `for...of`, and `Array.prototype.forEach`.
 
 ```ts
 // before
-for (let i = 0; i < items.length; i++) { doThing(items[i]); }
-for (const item of items) { doThing(item); }
+for (let i = 0; i < items.length; i++) {
+  doThing(items[i]);
+}
+for (const item of items) {
+  doThing(item);
+}
 items.forEach((item) => doThing(item));
 
 // after
@@ -79,7 +83,10 @@ Note: `forEach` also iterates objects, so `for (const key in obj)` becomes
 const names = users.filter((u) => u.active).map((u) => u.name);
 
 // after
-const names = map(filter(users, (u) => u.active), (u) => u.name);
+const names = map(
+  filter(users, (u) => u.active),
+  (u) => u.name,
+);
 // or use chaining (rule 11)
 ```
 
@@ -101,10 +108,14 @@ const safe = omit(user, ['password']);
 
 ```ts
 // before
-Object.keys(obj); Object.values(obj); Object.entries(obj);
+Object.keys(obj);
+Object.values(obj);
+Object.entries(obj);
 
 // after
-keys(obj); values(obj); entries(obj); // toPairs is an alias for entries
+keys(obj);
+values(obj);
+entries(obj); // toPairs is an alias for entries
 ```
 
 ### 5. String manipulation → `camelCase`, `kebabCase`, `snakeCase`, `startCase`, ...
@@ -113,20 +124,28 @@ Also `trim`, `upperFirst`, `lowerCase`, `capitalize`, `pad`, `truncate`, `repeat
 
 ```ts
 // before
-str.trim(); str.charAt(0).toUpperCase() + str.slice(1);
+str.trim();
+str.charAt(0).toUpperCase() + str.slice(1);
 
 // after
-trim(str); upperFirst(str);
+trim(str);
+upperFirst(str);
 ```
 
 ### 6. Number manipulation → `round`, `ceil`, `floor`, `random`, ...
 
 ```ts
 // before
-Math.round(x); Math.floor(x); Math.random(); Math.max(...nums);
+Math.round(x);
+Math.floor(x);
+Math.random();
+Math.max(...nums);
 
 // after
-round(x); floor(x); random(0, 1, true); max(nums);
+round(x);
+floor(x);
+random(0, 1, true);
+max(nums);
 // clamp, inRange also available
 ```
 
@@ -145,16 +164,23 @@ Date.now();
 now();
 ```
 
-### 8. Deep clone / merge → `cloneDeep`, `merge`
+### 8. Deep clone / merge / assign → `cloneDeep`, `merge`, `assign`
+
+Replace every `Object.assign` with lodash `assign` (same shallow-copy, mutate-first-arg
+semantics).
 
 ```ts
 // before
 const copy = JSON.parse(JSON.stringify(obj));
 const merged = { ...a, ...b }; // shallow
+const updated = Object.assign({}, a, b);
+Object.assign(target, source);
 
 // after
 const copy = cloneDeep(obj);
 const merged = merge({}, a, b); // deep; use assign/defaults for shallow intent
+const updated = assign({}, a, b);
+assign(target, source);
 ```
 
 ### 9. Type checking → `isArray`, `isObject`, `isString`, `isNumber`, ...
@@ -163,10 +189,14 @@ Also `isNil`, `isEmpty`, `isFunction`, `isBoolean`, `isPlainObject`, `isEqual`.
 
 ```ts
 // before
-Array.isArray(x); typeof x === 'string'; x === null || x === undefined;
+Array.isArray(x);
+typeof x === 'string';
+x === null || x === undefined;
 
 // after
-isArray(x); isString(x); isNil(x);
+isArray(x);
+isString(x);
+isNil(x);
 ```
 
 These helpers are typed as **type guards** in `@types/lodash-es` (e.g. `isString(x)`
@@ -192,7 +222,10 @@ Import `chain` by name like any other method.
 
 ```ts
 // before
-const result = map(filter(users, (u) => u.active), (u) => u.name);
+const result = map(
+  filter(users, (u) => u.active),
+  (u) => u.name,
+);
 
 // after
 const result = chain(users)

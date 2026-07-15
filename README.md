@@ -1,6 +1,10 @@
 # skills
 
-## General
+## TypeScript Guidelines
+
+```
+https://github.com/ChrisAraneo/skills/blob/master/.claude/skills/naming-conventions/SKILL.md
+```
 
 ```
 https://github.com/ChrisAraneo/skills/blob/master/.claude/skills/lodash-refactor/SKILL.md
@@ -10,7 +14,7 @@ https://github.com/ChrisAraneo/skills/blob/master/.claude/skills/lodash-refactor
 https://github.com/ChrisAraneo/skills/blob/master/.claude/skills/functional-pipelines/SKILL.md
 ```
 
-## Angular
+## Angular Guidelines
 
 ```
 https://github.com/ChrisAraneo/skills/blob/master/.claude/skills/angular-guidelines/SKILL.md

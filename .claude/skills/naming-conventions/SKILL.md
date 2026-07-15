@@ -1,6 +1,6 @@
 ---
 name: naming-conventions
-description: Naming conventions for functions, variables, and modules. Use when creating or naming any function, variable, or file in new code, and when refactoring or renaming legacy code so it converges on these conventions (verb patterns get/from/to/filter/compute/create/with/is/can; full descriptive names, never abbreviations).
+description: Naming conventions for functions, variables, and modules. Use when creating or naming any function, variable, or file in new code, and when refactoring or renaming legacy code so it converges on these conventions (verb patterns get/from/to/filter/compute/create/with/is/can/has; full descriptive names, never abbreviations).
 ---
 
 # Naming conventions
@@ -14,7 +14,7 @@ Always use full descriptive names. Never single-letter names, never abbreviation
 - Bad: `fa`, `ma`, `arr`, `idx`, `res`, `cfg`, `fn`, `e`
 - Good: `optionValue`, `players`, `index`, `result`, `config`, `mapper`, `error`
 - Collections are plural nouns: `players`, `battles` — not `playerList` or `playerArr`.
-- Booleans follow guard naming: `isGameOver`, `canDispatch`.
+- Booleans follow guard naming: `isGameOver`, `canDispatch`, `hasBuilding`.
 
 ## Function naming algorithm
 
@@ -40,6 +40,7 @@ Classify every function top-down — the first matching category wins — then a
 | Enhancer | `with` + Thing | clone an object with added properties | `withTotal`, `withGameOver` |
 | Guard (state) | `is` + Condition | boolean: is something the case | `isGameOver` |
 | Guard (ability) | `can` + Condition | boolean: may an operation run | `canDispatch` |
+| Guard (possession) | `has` + Thing | boolean: is the thing already defined/created on the object | `hasAction`, `hasBuilding` |
 | Other | verb + rest | any function not covered above | `dispatchAction`, `renderBoard` |
 
 Do not invent synonyms for these verbs (`fetch`/`extract` for `get`, `make`/`build` for `create`, `calc` for `compute`, etc.) — the vocabulary is closed.
@@ -65,7 +66,7 @@ Do not invent synonyms for these verbs (`fetch`/`extract` for `get`, `make`/`bui
   - `calc*`, `calculate*` → `compute*`
   - `make*`, `new*`, `build*`, `init*` → `create*`
   - `add*`, `set*` (when it clones with extra properties) → `with*`
-  - `check*`, `has*`, `validate*` (returning boolean) → `is*` / `can*`
+  - `check*`, `validate*`, `contains*`, `exists*` (returning boolean) → `is*` / `can*` / `has*`
 - Expand every abbreviation you encounter (`cfg` → `config`, `idx` → `index`, `res` → `result`), including in code you are only passing through.
 - Keep renames in separate commits from behavior changes so reviews stay readable.
 - Never rename an exported/public API in place if external consumers exist: add the new name, keep the old one as a deprecated alias (`/** @deprecated Use newName */ export const oldName = newName`), and remove it in the next major version.

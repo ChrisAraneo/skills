@@ -1,6 +1,6 @@
 ---
 name: naming-conventions
-description: Naming conventions for functions, variables, and modules. Use when creating or naming any function, variable, or file in new code, and when refactoring or renaming legacy code so it converges on these conventions (verb patterns get/from/to/filter/compute/create/with/is/can/has; full descriptive names, never abbreviations).
+description: Naming conventions for functions, variables, and modules. Use when creating or naming any function or variable in new code, and when refactoring or renaming legacy code so it converges on these conventions (verb patterns get/from/to/filter/compute/create/with/is/can/has; full descriptive names, never abbreviations).
 ---
 
 # Naming conventions
@@ -47,8 +47,7 @@ Do not invent synonyms for these verbs (`fetch`/`extract` for `get`, `make`/`bui
 
 ## Modules and files
 
-- One module per file, **PascalCase singular noun**: `Array.ts`, `Option.ts`, `HashMap.ts`, `MutableHashSet.ts`.
-- Private implementations live in `*/internal/` with **camelCase** filenames (`internal/hashMap.ts`); public modules re-export them (`export const succeed = internal.succeed`).
+Private implementations live in `*/internal/` with **camelCase** filenames (`internal/hashMap.ts`); public modules re-export them (`export const succeed = internal.succeed`).
 
 ## Applying to new code
 
@@ -68,6 +67,4 @@ Do not invent synonyms for these verbs (`fetch`/`extract` for `get`, `make`/`bui
   - `add*`, `set*` (when it clones with extra properties) → `with*`
   - `check*`, `validate*`, `contains*`, `exists*` (returning boolean) → `is*` / `can*` / `has*`
 - Expand every abbreviation you encounter (`cfg` → `config`, `idx` → `index`, `res` → `result`), including in code you are only passing through.
-- Keep renames in separate commits from behavior changes so reviews stay readable.
-- Never rename an exported/public API in place if external consumers exist: add the new name, keep the old one as a deprecated alias (`/** @deprecated Use newName */ export const oldName = newName`), and remove it in the next major version.
 - Converge module-by-module as files are touched — no drive-by mass renames across the whole codebase.

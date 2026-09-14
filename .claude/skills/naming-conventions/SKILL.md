@@ -1,6 +1,6 @@
 ---
 name: naming-conventions
-description: Naming conventions for functions, variables, and modules. Use when creating or naming any function or variable in new code, and when refactoring or renaming legacy code so it converges on these conventions (verb patterns get/from/to/filter/compute/create/with/is/can/has; full descriptive names, never abbreviations).
+description: Naming conventions for functions, variables, and modules. Use when creating or naming any function or variable in new code, and when refactoring or renaming legacy code so it converges on these conventions (verb patterns get/from/to/filter/create/with/is/can/has/have/should/handle/compute; full descriptive names, never abbreviations).
 ---
 
 # Naming conventions
@@ -14,7 +14,7 @@ Always use full descriptive names. Never single-letter names, never abbreviation
 - Bad: `fa`, `ma`, `arr`, `idx`, `res`, `cfg`, `fn`, `e`
 - Good: `optionValue`, `players`, `index`, `result`, `config`, `mapper`, `error`
 - Collections are plural nouns: `players`, `battles` — not `playerList` or `playerArr`.
-- Booleans follow guard naming: `isGameOver`, `canDispatch`, `hasBuilding`.
+- Booleans follow guard naming: `isGameOver`, `canDispatch`, `hasBuilding`, `haveResources`, `shouldSkipTurn`.
 
 ## Function naming algorithm
 
@@ -23,11 +23,12 @@ Classify every function top-down — the first matching category wins — then a
 1. Extracts a value from a complex object → **Extractor**
 2. Maps one piece of data into another → **Mapping**
 3. Filters data → **Filtering**
-4. Makes a complex calculation and returns a simple result → **Computing**
-5. Creates or initializes objects → **Constructor**
-6. Adds to an object (e.g. new properties) → **Enhancer**
-7. Returns a boolean → **Guard**
-8. Otherwise → **Other**: name it `verb` + rest
+4. Creates or initializes objects → **Constructor**
+5. Adds to an object (e.g. new properties) → **Enhancer**
+6. Returns a boolean → **Guard** (differentiated by state, ability, possession, or policy)
+7. Handles an event or UI/system behavior → **Handler**
+8. Makes a complex calculation and returns a simple result → **Computing**
+9. Otherwise → **Other**: name it `verb` + rest
 
 | Category | Pattern | Meaning | Examples |
 | --- | --- | --- | --- |
@@ -35,15 +36,18 @@ Classify every function top-down — the first matching category wins — then a
 | Mapping (into) | `from` + Type | conversion **into** this type from another | `fromEither`, `fromNullable`, `fromPredicate` |
 | Mapping (out of) | `to` + Type | conversion **out of** this type | `toNullable`, `toUndefined`, `toArray` |
 | Filtering | `filter` + Condition | keep the data matching a condition | `filter`, `filterNonEmpty` |
-| Computing | `compute` + Thing | complex calculation, simple result | `computeBattleResult`, `computeTotalAlivePlayers` |
 | Constructor | `create` + Thing | create or initialize a new object | `createGameState`, `createPlanet` |
 | Enhancer | `with` + Thing | clone an object with added properties | `withTotal`, `withGameOver` |
-| Guard (state) | `is` + Condition | boolean: is something the case | `isGameOver` |
-| Guard (ability) | `can` + Condition | boolean: may an operation run | `canDispatch` |
-| Guard (possession) | `has` + Thing | boolean: is the thing already defined/created on the object | `hasAction`, `hasBuilding` |
+| Guard (state) | `is` + Condition | boolean: is something the case | `isGameOver`, `isActive` |
+| Guard (ability) | `can` + Action | boolean: may an operation run | `canDispatch`, `canAttack` |
+| Guard (singular possession)| `has` + Thing | boolean: is a singular thing already defined/created on the object | `hasAction`, `hasBuilding` |
+| Guard (plural possession) | `have` + Things | boolean: does the object possess a collection or meet a plural requirement | `haveResources`, `haveRequiredItems` |
+| Guard (policy/requirement)| `should` + Action | boolean: is it recommended or required by business logic to perform an action | `shouldRender`, `shouldSkipTurn` |
+| Handler | `handle` + Event | handle an event or interactive behavior | `handleKeyDown`, `handleStopEvent`, `handleResumeEvent` |
+| Computing | `compute` + Thing | complex calculation, simple result | `computeBattleResult`, `computeTotalAlivePlayers` |
 | Other | verb + rest | any function not covered above | `dispatchAction`, `renderBoard` |
 
-Do not invent synonyms for these verbs (`fetch`/`extract` for `get`, `make`/`build` for `create`, `calc` for `compute`, etc.) — the vocabulary is closed.
+Do not invent synonyms for these verbs (`fetch`/`extract` for `get`, `make`/`build` for `create`, `calc` for `compute`, `needs`/`must` for `should`, `on`/`process` for `handle`, etc.) — the vocabulary is closed.
 
 ## Modules and files
 
@@ -62,9 +66,11 @@ Private implementations live in `*/internal/` with **camelCase** filenames (`int
   - `extract*`, `pluck*`, `fetch*` (from an object) → `get*`
   - `parse*`, `convert*`, `decode*` (into this type) → `from*`
   - `serialize*`, `encode*` (out of this type) → `to*`
-  - `calc*`, `calculate*` → `compute*`
   - `make*`, `new*`, `build*`, `init*` → `create*`
   - `add*`, `set*` (when it clones with extra properties) → `with*`
-  - `check*`, `validate*`, `contains*`, `exists*` (returning boolean) → `is*` / `can*` / `has*`
+  - `check*`, `validate*`, `contains*`, `exists*` (returning boolean) → `is*` / `can*` / `has*` / `have*`
+  - `needs*`, `must*`, `requires*` (returning boolean) → `should*`
+  - `on*`, `process*`, `listen*` (handling an event) → `handle*`
+  - `calc*`, `calculate*` → `compute*`
 - Expand every abbreviation you encounter (`cfg` → `config`, `idx` → `index`, `res` → `result`), including in code you are only passing through.
 - Converge module-by-module as files are touched — no drive-by mass renames across the whole codebase.

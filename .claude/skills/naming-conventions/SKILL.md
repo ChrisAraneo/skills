@@ -1,6 +1,6 @@
 ---
 name: naming-conventions
-description: Naming conventions for functions, variables, and modules. Use when creating or naming any function or variable in new code, and when refactoring or renaming legacy code so it converges on these conventions (verb patterns get/from/to/filter/create/with/is/can/has/have/should/handle/compute; full descriptive names, never abbreviations).
+description: Naming conventions for functions, variables, and modules. Use when creating or naming any function or variable in new code, and when refactoring or renaming legacy code so it converges on these conventions (verb patterns get/from/to/find/filter/create/with/is/can/has/have/should/handle/compute; full descriptive names, never abbreviations).
 ---
 
 # Naming conventions
@@ -22,19 +22,21 @@ Classify every function top-down — the first matching category wins — then a
 
 1. Extracts a value from a complex object → **Extractor**
 2. Maps one piece of data into another → **Mapping**
-3. Filters data → **Filtering**
-4. Creates or initializes objects → **Constructor**
-5. Adds to an object (e.g. new properties) → **Enhancer**
-6. Returns a boolean → **Guard** (differentiated by state, ability, possession, or policy)
-7. Handles an event or UI/system behavior → **Handler**
-8. Makes a complex calculation and returns a simple result → **Computing**
-9. Otherwise → **Other**: name it `verb` + rest
+3. Locates a single item in a collection → **Finder**
+4. Filters data → **Filtering**
+5. Creates or initializes objects → **Constructor**
+6. Adds to an object (e.g. new properties) → **Enhancer**
+7. Returns a boolean → **Guard** (differentiated by state, ability, possession, or policy)
+8. Handles an event or UI/system behavior → **Handler**
+9. Makes a complex calculation and returns a simple result → **Computing**
+10. Otherwise → **Other**: name it `verb` + rest
 
 | Category | Pattern | Meaning | Examples |
 | --- | --- | --- | --- |
 | Extractor | `get` + Thing | pull a value out of a complex object | `getLeft`, `getRight`, `getOrElse` |
 | Mapping (into) | `from` + Type | conversion **into** this type from another | `fromEither`, `fromNullable`, `fromPredicate` |
 | Mapping (out of) | `to` + Type | conversion **out of** this type | `toNullable`, `toUndefined`, `toArray` |
+| Finder | `find` + Target | return a single item from a collection or `undefined` | `findBoundary`, `findMarker`, `findTile` |
 | Filtering | `filter` + Condition | keep the data matching a condition | `filter`, `filterNonEmpty` |
 | Constructor | `create` + Thing | create or initialize a new object | `createGameState`, `createPlanet` |
 | Enhancer | `with` + Thing | clone an object with added properties | `withTotal`, `withGameOver` |
@@ -47,7 +49,7 @@ Classify every function top-down — the first matching category wins — then a
 | Computing | `compute` + Thing | complex calculation, simple result | `computeBattleResult`, `computeTotalAlivePlayers` |
 | Other | verb + rest | any function not covered above | `dispatchAction`, `renderBoard` |
 
-Do not invent synonyms for these verbs (`fetch`/`extract` for `get`, `make`/`build` for `create`, `calc` for `compute`, `needs`/`must` for `should`, `on`/`process` for `handle`, etc.) — the vocabulary is closed.
+Do not invent synonyms for these verbs (`fetch`/`extract` for `get`, `locate`/`search` for `find`, `make`/`build` for `create`, `calc` for `compute`, `needs`/`must` for `should`, `on`/`process` for `handle`, etc.) — the vocabulary is closed.
 
 ## Modules and files
 
@@ -66,6 +68,7 @@ Private implementations live in `*/internal/` with **camelCase** filenames (`int
   - `extract*`, `pluck*`, `fetch*` (from an object) → `get*`
   - `parse*`, `convert*`, `decode*` (into this type) → `from*`
   - `serialize*`, `encode*` (out of this type) → `to*`
+  - `locate*`, `search*`, `lookup*` (single element search) → `find*`
   - `make*`, `new*`, `build*`, `init*` → `create*`
   - `add*`, `set*` (when it clones with extra properties) → `with*`
   - `check*`, `validate*`, `contains*`, `exists*` (returning boolean) → `is*` / `can*` / `has*` / `have*`

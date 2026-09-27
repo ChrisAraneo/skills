@@ -1,6 +1,6 @@
 ---
 name: naming-conventions
-description: Naming conventions for functions, variables, and modules. Use when creating or naming any function or variable in new code, and when refactoring or renaming legacy code so it converges on these conventions (verb patterns get/from/to/find/filter/create/with/is/can/has/have/should/handle/compute; full descriptive names, never abbreviations).
+description: Naming conventions for functions, variables, and modules. Use when creating or naming any function or variable in new code, and when refactoring or renaming legacy code so it converges on these conventions (verb patterns get/from/to/find/filter/create/with/is/can/has/have/should/handle/draw/compute; full descriptive names, never abbreviations; kebab-case for file names).
 ---
 
 # Naming conventions
@@ -28,8 +28,9 @@ Classify every function top-down — the first matching category wins — then a
 6. Adds to an object (e.g. new properties) → **Enhancer**
 7. Returns a boolean → **Guard** (differentiated by state, ability, possession, or policy)
 8. Handles an event or UI/system behavior → **Handler**
-9. Makes a complex calculation and returns a simple result → **Computing**
-10. Otherwise → **Other**: name it `verb` + rest
+9. Renders or draws elements directly onto an HTML5 canvas context → **Drawer**
+10. Makes a complex calculation and returns a simple result → **Computing**
+11. Otherwise → **Other**: name it `verb` + rest
 
 | Category | Pattern | Meaning | Examples |
 | --- | --- | --- | --- |
@@ -46,14 +47,15 @@ Classify every function top-down — the first matching category wins — then a
 | Guard (plural possession) | `have` + Things | boolean: does the object possess a collection or meet a plural requirement | `haveResources`, `haveRequiredItems` |
 | Guard (policy/requirement)| `should` + Action | boolean: is it recommended or required by business logic to perform an action | `shouldRender`, `shouldSkipTurn` |
 | Handler | `handle` + Event | handle an event or interactive behavior | `handleKeyDown`, `handleStopEvent`, `handleResumeEvent` |
+| Drawer | `draw` + Target | render visual elements onto an HTML5 canvas context | `drawPlayer`, `drawBoard`, `drawHealthBar` |
 | Computing | `compute` + Thing | complex calculation, simple result | `computeBattleResult`, `computeTotalAlivePlayers` |
-| Other | verb + rest | any function not covered above | `dispatchAction`, `renderBoard` |
+| Other | verb + rest | any function not covered above | `dispatchAction`, `saveState` |
 
-Do not invent synonyms for these verbs (`fetch`/`extract` for `get`, `locate`/`search` for `find`, `make`/`build` for `create`, `calc` for `compute`, `needs`/`must` for `should`, `on`/`process` for `handle`, etc.) — the vocabulary is closed.
+Do not invent synonyms for these verbs (`fetch`/`extract` for `get`, `locate`/`search` for `find`, `make`/`build` for `create`, `paint`/`render` for `draw`, `calc` for `compute`, `needs`/`must` for `should`, `on`/`process` for `handle`, etc.) — the vocabulary is closed.
 
 ## Modules and files
 
-Private implementations live in `*/internal/` with **camelCase** filenames (`internal/hashMap.ts`); public modules re-export them (`export const succeed = internal.succeed`).
+Private implementations live in `*/internal/` with **kebab-case** filenames (`internal/hash-map.ts`); public modules re-export them (`export const succeed = internal.succeed`).
 
 ## Applying to new code
 
@@ -74,6 +76,7 @@ Private implementations live in `*/internal/` with **camelCase** filenames (`int
   - `check*`, `validate*`, `contains*`, `exists*` (returning boolean) → `is*` / `can*` / `has*` / `have*`
   - `needs*`, `must*`, `requires*` (returning boolean) → `should*`
   - `on*`, `process*`, `listen*` (handling an event) → `handle*`
+  - `paint*`, `renderCanvas*` (drawing to canvas context) → `draw*`
   - `calc*`, `calculate*` → `compute*`
 - Expand every abbreviation you encounter (`cfg` → `config`, `idx` → `index`, `res` → `result`), including in code you are only passing through.
 - Converge module-by-module as files are touched — no drive-by mass renames across the whole codebase.

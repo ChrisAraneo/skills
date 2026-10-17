@@ -23,3 +23,11 @@ https://github.com/ChrisAraneo/skills/blob/master/.claude/skills/one-declaration
 ```
 https://github.com/ChrisAraneo/skills/blob/master/.claude/skills/angular-guidelines/SKILL.md
 ```
+
+## Note-taking
+
+Creating a VitePress chapter based on the provided texts.
+
+```
+https://github.com/ChrisAraneo/skills/blob/master/.claude/skills/notes-to-chapter/SKILL.md
+```
